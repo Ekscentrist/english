@@ -1,9 +1,7 @@
-import { computed, reactive, ref, watch } from 'vue'
+import { computed, reactive, ref } from 'vue'
 import { plan, TOTAL_SESSIONS, getAllSessions, findSessionMeta } from '../data/plan.js'
-import { pb, PROGRESS_KEY, PROGRESS_COLLECTION } from '../lib/pocketbase.js'
 
 const LOCAL_STORAGE_KEY = 'interview-prep-progress'
-const SAVE_DEBOUNCE_MS = 400
 
 const emptyRatings = () => ({
   grammar: 0,
@@ -38,16 +36,6 @@ function normalizeState(raw) {
   }
 }
 
-function readLocalStorageFallback() {
-  try {
-    const raw = localStorage.getItem(LOCAL_STORAGE_KEY)
-    if (!raw) return null
-    return normalizeState(JSON.parse(raw))
-  } catch {
-    return null
-  }
-}
-
 function applyState(target, next) {
   target.sessions = next.sessions
   target.homework = next.homework
@@ -72,92 +60,98 @@ function dateKeyFromOffset(offsetDays) {
   return `${y}-${m}-${day}`
 }
 
+function readLocalStorageFallback() {
+  try {
+    const raw = localStorage.getItem(LOCAL_STORAGE_KEY)
+    if (!raw) return null
+    return normalizeState(JSON.parse(raw))
+  } catch {
+    return null
+  }
+}
+
 const state = reactive(defaultState())
 const syncStatus = ref('loading')
 const ready = ref(false)
+const lastSessionId = ref(null)
 
-let recordId = null
-let hydrating = true
-let saveTimer = null
+let cheatsheetTimer = null
 
-function snapshotState() {
-  return {
-    sessions: JSON.parse(JSON.stringify(state.sessions)),
-    homework: { ...state.homework },
-    shadowing: { ...state.shadowing },
-    readiness: { ...state.readiness },
-  }
+function hasApi() {
+  return typeof window !== 'undefined' && window.api?.progress
 }
 
-async function persistToPocketBase() {
-  if (hydrating || !ready.value) return
-  const payload = {
-    key: PROGRESS_KEY,
-    data: snapshotState(),
-  }
+function applyFromProgress(progress) {
+  applyState(state, normalizeState(progress))
+  lastSessionId.value = progress.lastSessionId || null
+}
 
-  try {
-    if (recordId) {
-      await pb.collection(PROGRESS_COLLECTION).update(recordId, payload)
-    } else {
-      const created = await pb.collection(PROGRESS_COLLECTION).create(payload)
-      recordId = created.id
-    }
-    syncStatus.value = 'ok'
-  } catch (err) {
-    console.error('PocketBase save failed', err)
+async function withSave(action) {
+  if (!hasApi()) {
     syncStatus.value = 'error'
+    return
   }
-}
-
-function scheduleSave() {
-  if (hydrating || !ready.value) return
   syncStatus.value = 'saving'
-  clearTimeout(saveTimer)
-  saveTimer = setTimeout(() => {
-    void persistToPocketBase()
-  }, SAVE_DEBOUNCE_MS)
-}
-
-watch(state, scheduleSave, { deep: true })
-
-async function loadFromPocketBase() {
-  hydrating = true
-  syncStatus.value = 'loading'
-
   try {
-    const result = await pb.collection(PROGRESS_COLLECTION).getList(1, 1, {
-      filter: `key="${PROGRESS_KEY}"`,
-    })
-
-    if (result.items.length > 0) {
-      const record = result.items[0]
-      recordId = record.id
-      applyState(state, normalizeState(record.data))
-    } else {
-      const migrated = readLocalStorageFallback() || defaultState()
-      applyState(state, migrated)
-      const created = await pb.collection(PROGRESS_COLLECTION).create({
-        key: PROGRESS_KEY,
-        data: snapshotState(),
-      })
-      recordId = created.id
-    }
-
+    const progress = await action()
+    if (progress) applyFromProgress(progress)
     syncStatus.value = 'ok'
-    ready.value = true
   } catch (err) {
-    console.error('PocketBase load failed', err)
-    const fallback = readLocalStorageFallback() || defaultState()
-    applyState(state, fallback)
+    console.error('SQLite save failed', err)
     syncStatus.value = 'error'
-    ready.value = true
-  } finally {
-    hydrating = false
   }
 }
 
-loadFromPocketBase()
+function scheduleCheatsheetSave(sessionId, cheatsheet) {
+  syncStatus.value = 'saving'
+  clearTimeout(cheatsheetTimer)
+  cheatsheetTimer = setTimeout(() => {
+    void withSave(() => window.api.progress.setCheatsheet(sessionId, cheatsheet))
+  }, 400)
+}
+
+async function migrateFromLocalStorageIfNeeded(progress) {
+  if (progress.migratedV1) return progress
+  const legacy = readLocalStorageFallback()
+  if (!legacy) {
+    await window.api.progress.markMigrated()
+    return progress
+  }
+  const hasRemoteData =
+    Object.keys(progress.sessions || {}).length > 0 ||
+    Object.values(progress.homework || {}).some(Boolean) ||
+    Object.keys(progress.shadowing || {}).length > 0 ||
+    Object.values(progress.readiness || {}).some(Boolean)
+  if (hasRemoteData) {
+    await window.api.progress.markMigrated()
+    return progress
+  }
+  return window.api.progress.import(legacy)
+}
+
+async function loadProgress() {
+  syncStatus.value = 'loading'
+  try {
+    if (!hasApi()) {
+      applyState(state, readLocalStorageFallback() || defaultState())
+      syncStatus.value = 'error'
+      ready.value = true
+      return
+    }
+    let progress = await window.api.progress.get()
+    progress = await migrateFromLocalStorageIfNeeded(progress)
+    applyFromProgress(progress)
+    syncStatus.value = 'ok'
+    ready.value = true
+  } catch (err) {
+    console.error('SQLite load failed', err)
+    applyState(state, readLocalStorageFallback() || defaultState())
+    syncStatus.value = 'error'
+    ready.value = true
+  }
+}
+
+loadProgress()
 
 function ensureSession(id) {
   const key = String(id)
@@ -165,11 +159,13 @@ function ensureSession(id) {
     state.sessions[key] = {
       done: false,
       ratings: emptyRatings(),
-      notes: '',
       cheatsheet: '',
     }
   } else if (state.sessions[key].cheatsheet === undefined) {
     state.sessions[key].cheatsheet = ''
+  }
+  if (!state.sessions[key].ratings) {
+    state.sessions[key].ratings = emptyRatings()
   }
   return state.sessions[key]
 }
@@ -196,28 +192,35 @@ export function useProgress() {
     return ensureSession(sessionId)
   }
 
-  function toggleSession(sessionId) {
+  async function toggleSession(sessionId) {
     const session = ensureSession(sessionId)
-    session.done = !session.done
+    const next = !session.done
+    session.done = next
+    await withSave(() => window.api.progress.setSessionDone(sessionId, next))
   }
 
-  function setRating(sessionId, key, value) {
+  async function setSessionDone(sessionId, done) {
+    const session = ensureSession(sessionId)
+    session.done = done
+    await withSave(() => window.api.progress.setSessionDone(sessionId, done))
+  }
+
+  async function setRating(sessionId, key, value) {
     const session = ensureSession(sessionId)
     session.ratings[key] = value
+    await withSave(() => window.api.progress.setRating(sessionId, key, value))
   }
 
-  function setNotes(sessionId, notes) {
-    const session = ensureSession(sessionId)
-    session.notes = notes
-  }
-
-  function setCheatsheet(sessionId, cheatsheet) {
+  async function setCheatsheet(sessionId, cheatsheet) {
     const session = ensureSession(sessionId)
     session.cheatsheet = cheatsheet
+    scheduleCheatsheetSave(sessionId, cheatsheet)
   }
 
-  function toggleHomework(id) {
-    state.homework[id] = !state.homework[id]
+  async function toggleHomework(id) {
+    const next = !state.homework[id]
+    state.homework[id] = next
+    await withSave(() => window.api.progress.setHomework(id, next))
   }
 
   function isHomeworkDone(id) {
@@ -232,12 +235,14 @@ export function useProgress() {
     return Boolean(state.shadowing[date])
   }
 
-  function toggleShadowing(date = todayKey()) {
-    state.shadowing[date] = !state.shadowing[date]
+  async function toggleShadowing(date = todayKey()) {
+    const next = !state.shadowing[date]
+    state.shadowing[date] = next
+    await withSave(() => window.api.progress.setShadowing(date, next))
   }
 
-  function toggleShadowingToday() {
-    toggleShadowing(todayKey())
+  async function toggleShadowingToday() {
+    await toggleShadowing(todayKey())
   }
 
   const shadowingRecentCount = computed(() => {
@@ -279,16 +284,24 @@ export function useProgress() {
       title: next.title,
       stageId: next.stageId,
       stageTitle: next.stageTitle,
-      href: `#session-${next.id}`,
     }
+  })
+
+  const practiceSessionId = computed(() => {
+    if (lastSessionId.value && findSessionMeta(Number(lastSessionId.value) || lastSessionId.value)) {
+      return String(lastSessionId.value)
+    }
+    return nextSession.value ? String(nextSession.value.id) : '1'
   })
 
   function isReadinessDone(id) {
     return Boolean(state.readiness[id])
   }
 
-  function toggleReadiness(id) {
-    state.readiness[id] = !state.readiness[id]
+  async function toggleReadiness(id) {
+    const next = !state.readiness[id]
+    state.readiness[id] = next
+    await withSave(() => window.api.progress.setReadiness(id, next))
   }
 
   const readinessDoneCount = computed(
@@ -300,15 +313,50 @@ export function useProgress() {
   )
 
   async function resetAll() {
-    const next = defaultState()
-    applyState(state, next)
-    await persistToPocketBase()
+    await withSave(() => window.api.progress.resetAll())
+  }
+
+  async function startRun(sessionId) {
+    if (!hasApi()) return null
+    const runId = await window.api.progress.startRun(sessionId)
+    lastSessionId.value = String(sessionId)
+    return runId
+  }
+
+  async function finishRun(runId, payload) {
+    if (!hasApi() || !runId) return
+    await window.api.progress.finishRun(runId, payload)
+  }
+
+  async function exportViaDialog() {
+    if (!hasApi()) return { ok: false }
+    return window.api.dialog.exportProgress()
+  }
+
+  async function importViaDialog() {
+    if (!hasApi()) return { ok: false }
+    syncStatus.value = 'saving'
+    try {
+      const result = await window.api.dialog.importProgress()
+      if (result.ok && result.progress) applyFromProgress(result.progress)
+      syncStatus.value = 'ok'
+      return result
+    } catch (err) {
+      console.error(err)
+      syncStatus.value = 'error'
+      return { ok: false }
+    }
+  }
+
+  async function reload() {
+    await loadProgress()
   }
 
   return {
     state,
     ready,
     syncStatus,
+    lastSessionId,
     completedCount,
     progressPercent,
     totalSessions: TOTAL_SESSIONS,
@@ -316,8 +364,8 @@ export function useProgress() {
     isDone,
     getSession,
     toggleSession,
+    setSessionDone,
     setRating,
-    setNotes,
     setCheatsheet,
     toggleHomework,
     isHomeworkDone,
@@ -329,6 +377,7 @@ export function useProgress() {
     shadowingStreak,
     recentShadowing,
     nextSession,
+    practiceSessionId,
     isReadinessDone,
     toggleReadiness,
     readinessDoneCount,
@@ -336,5 +385,10 @@ export function useProgress() {
     findSessionMeta,
     todayKey: todayKey(),
     resetAll,
+    startRun,
+    finishRun,
+    exportViaDialog,
+    importViaDialog,
+    reload,
   }
 }

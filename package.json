@@ -1,23 +1,68 @@
 {
   "name": "interview-prep-tracker",
   "private": true,
-  "version": "1.0.0",
+  "version": "2.0.0",
+  "description": "English IT Interview Prep Tracker — desktop app",
+  "author": "Interview Prep",
   "type": "module",
+  "main": "./out/main/index.js",
   "scripts": {
-    "dev": "vite",
-    "dev:app": "concurrently -k -n pb,vite -c yellow,cyan \"npm run pb\" \"npm run dev\"",
-    "build": "vite build",
-    "preview": "vite preview",
-    "pb:download": "node scripts/download-pocketbase.mjs",
-    "pb": "node scripts/run-pocketbase.mjs"
+    "dev": "electron-vite dev",
+    "build": "electron-vite build",
+    "dist": "node scripts/dist-win.mjs",
+    "preview": "electron-vite preview",
+    "icons": "node scripts/generate-icons.mjs",
+    "postinstall": "electron-builder install-app-deps"
   },
   "dependencies": {
-    "pocketbase": "^0.26.0",
-    "vue": "^3.5.13"
+    "better-sqlite3": "^11.8.1",
+    "vue": "^3.5.13",
+    "vue-router": "^4.5.0"
   },
   "devDependencies": {
     "@vitejs/plugin-vue": "^5.2.1",
-    "concurrently": "^9.1.2",
+    "electron": "^34.0.0",
+    "electron-builder": "^25.1.8",
+    "electron-vite": "^3.0.0",
+    "sharp": "^0.35.3",
+    "to-ico": "^1.1.5",
     "vite": "^6.0.0"
+  },
+  "build": {
+    "appId": "com.interview.prep.tracker",
+    "productName": "Interview Prep Tracker",
+    "directories": {
+      "output": "release",
+      "buildResources": "build"
+    },
+    "files": [
+      "out/**/*"
+    ],
+    "extraResources": [
+      {
+        "from": "build/icon.ico",
+        "to": "icon.ico"
+      }
+    ],
+    "icon": "build/icon.ico",
+    "win": {
+      "target": [
+        "nsis"
+      ],
+      "icon": "build/icon.ico",
+      "signAndEditExecutable": true,
+      "signtoolOptions": {
+        "signingHashAlgorithms": [
+          "sha256"
+        ]
+      }
+    },
+    "nsis": {
+      "oneClick": true,
+      "allowToChangeInstallationDirectory": false,
+      "installerIcon": "build/icon.ico",
+      "uninstallerIcon": "build/icon.ico",
+      "installerHeaderIcon": "build/icon.ico"
+    }
   }
 }

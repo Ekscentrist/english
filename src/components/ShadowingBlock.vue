@@ -20,7 +20,7 @@ const {
         <p class="muted">{{ plan.shadowing.description }}</p>
       </div>
       <span class="tag" :class="{ success: shadowingStreak > 0 }">
-        streak {{ shadowingStreak }} · {{ shadowingRecentCount }}/7 за 7 дней
+        streak {{ shadowingStreak }} · {{ shadowingRecentCount }}/7 in 7 days
       </span>
     </div>
 
@@ -30,10 +30,10 @@ const {
         :checked="isShadowingDone()"
         @change="toggleShadowingToday"
       />
-      <span>Сегодня сделано (~10 минут)</span>
+      <span>Done today (~10 minutes)</span>
     </label>
 
-    <div class="calendar" aria-label="Последние 14 дней">
+    <div class="calendar" aria-label="Last 14 days">
       <button
         v-for="day in recentShadowing"
         :key="day.date"
@@ -48,7 +48,7 @@ const {
       </button>
     </div>
 
-    <h3>Фразы для практики</h3>
+    <h3>Practice phrases</h3>
     <ul class="phrases">
       <li v-for="phrase in plan.shadowing.phrases" :key="phrase">
         <code>{{ phrase }}</code>

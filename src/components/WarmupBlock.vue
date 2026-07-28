@@ -25,7 +25,7 @@ async function copyPrompt() {
     </div>
     <p class="note muted">{{ plan.warmup.note }}</p>
 
-    <h3>Голосовая команда</h3>
+    <h3>Voice prompt</h3>
     <div class="prompt-box">
       <pre>{{ plan.warmup.prompt }}</pre>
       <div class="prompt-actions">
@@ -35,12 +35,12 @@ async function copyPrompt() {
           :class="{ copied }"
           @click="copyPrompt"
         >
-          {{ copied ? 'Скопировано' : 'Копировать' }}
+          {{ copied ? 'Copied' : 'Copy' }}
         </button>
       </div>
     </div>
 
-    <h3>Примеры вопросов</h3>
+    <h3>Example questions</h3>
     <ul class="examples">
       <li v-for="q in plan.warmup.exampleQuestions" :key="q">{{ q }}</li>
     </ul>

@@ -21,9 +21,9 @@ async function copyPrompt() {
   <section id="post-session" class="panel">
     <div class="head">
       <h2>{{ plan.postSession.title }}</h2>
-      <span class="tag">Всегда</span>
+      <span class="tag">Always</span>
     </div>
-    <p class="muted intro">После каждой сессии проси у ИИ этот фидбек:</p>
+    <p class="muted intro">After every session, ask the AI for this feedback:</p>
 
     <div class="prompt-box">
       <pre>{{ plan.postSession.prompt }}</pre>
@@ -34,7 +34,7 @@ async function copyPrompt() {
           :class="{ copied }"
           @click="copyPrompt"
         >
-          {{ copied ? 'Скопировано' : 'Копировать' }}
+          {{ copied ? 'Copied' : 'Copy' }}
         </button>
       </div>
     </div>
