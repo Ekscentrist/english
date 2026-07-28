@@ -47,7 +47,8 @@
     "icon": "build/icon.ico",
     "win": {
       "target": [
-        "nsis"
+        "nsis",
+        "portable"
       ],
       "icon": "build/icon.ico",
       "signAndEditExecutable": true,

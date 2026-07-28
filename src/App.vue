@@ -35,8 +35,13 @@ const { ready } = useProgress()
   min-width: 0;
   align-self: start;
   width: 100%;
-  max-width: 920px;
-  padding: 1.5rem 1.75rem 3rem;
+  padding: 1.5rem 2rem 3rem;
+}
+
+@media (min-width: 1400px) {
+  .content {
+    padding-inline: 2.5rem;
+  }
 }
 
 @media (max-width: 860px) {

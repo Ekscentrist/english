@@ -19,7 +19,6 @@
   --shadow: 0 12px 40px rgba(0, 0, 0, 0.28);
   --sans: 'DM Sans', system-ui, sans-serif;
   --mono: 'IBM Plex Mono', ui-monospace, monospace;
-  --max: 840px;
 }
 
 *,
