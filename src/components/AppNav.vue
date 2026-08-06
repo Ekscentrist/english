@@ -15,6 +15,7 @@ const links = computed(() => [
     match: (name) => name === 'session',
   },
   { to: '/curriculum', label: 'Curriculum', match: (name) => name === 'curriculum' },
+  { to: '/cheatsheets', label: 'Cheatsheets', match: (name) => name === 'cheatsheets' },
   { to: '/habits', label: 'Habits', match: (name) => name === 'habits' },
   { to: '/settings', label: 'Settings', match: (name) => name === 'settings' },
 ])
