@@ -155,6 +155,13 @@ button {
   color: var(--text-muted);
 }
 
+mark.search-hit {
+  background: #e8c547;
+  color: #1a1408;
+  border-radius: 2px;
+  padding: 0 0.12em;
+}
+
 .prompt-box {
   position: relative;
   margin-top: 0.75rem;

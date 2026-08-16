@@ -1,6 +1,8 @@
 <script setup>
 import { computed, onMounted, ref } from 'vue'
 import { useQa } from '../composables/useQa.js'
+import HighlightedText from '../components/HighlightedText.vue'
+import { matchesQuery } from '../utils/highlight.js'
 
 const { entries, ready, errorMessage, loadQa, createEntry, updateEntry, deleteEntry } = useQa()
 
@@ -16,11 +18,7 @@ onMounted(() => {
 })
 
 const filtered = computed(() => {
-  const q = query.value.trim().toLowerCase()
-  if (!q) return entries.value
-  return entries.value.filter((item) => {
-    return item.question.toLowerCase().includes(q) || item.answer.toLowerCase().includes(q)
-  })
+  return entries.value.filter((item) => matchesQuery(query.value, item.question, item.answer))
 })
 
 const formTitle = computed(() => (editingId.value ? 'Edit question' : 'New question'))
@@ -137,7 +135,7 @@ async function removeEntry(item) {
 
     <article v-for="item in filtered" :key="item.id" class="panel entry">
       <div class="entry-head">
-        <h2>{{ item.question }}</h2>
+        <h2><HighlightedText :text="item.question" :query="query" /></h2>
         <div class="entry-actions">
           <button type="button" class="btn btn-ghost" @click="openEdit(item)">Edit</button>
           <button type="button" class="btn btn-ghost danger" @click="removeEntry(item)">
@@ -145,7 +143,7 @@ async function removeEntry(item) {
           </button>
         </div>
       </div>
-      <pre class="body">{{ item.answer }}</pre>
+      <pre class="body"><HighlightedText :text="item.answer" :query="query" /></pre>
     </article>
   </div>
 </template>

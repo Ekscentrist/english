@@ -1,11 +1,14 @@
 <script setup>
-import { computed } from 'vue'
+import { computed, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { getAllSessions } from '../data/plan.js'
 import { useProgress } from '../composables/useProgress.js'
+import HighlightedText from '../components/HighlightedText.vue'
+import { matchesQuery } from '../utils/highlight.js'
 
 const router = useRouter()
 const { state } = useProgress()
+const query = ref('')
 
 const items = computed(() =>
   getAllSessions()
@@ -15,6 +18,17 @@ const items = computed(() =>
     }))
     .filter((session) => session.cheatsheet),
 )
+
+const filtered = computed(() =>
+  items.value.filter((item) =>
+    matchesQuery(query.value, item.title, item.stageTitle, item.cheatsheet),
+  ),
+)
+
+const emptyMessage = computed(() => {
+  if (!items.value.length) return 'No cheatsheets yet. Add notes on a Practice session.'
+  return 'No matches. Try another search.'
+})
 
 function openSession(id) {
   router.push(`/session/${id}`)
@@ -31,24 +45,37 @@ function openSession(id) {
       </div>
     </header>
 
-    <p v-if="!items.length" class="panel empty muted">
-      No cheatsheets yet. Add notes on a Practice session.
-    </p>
+    <section class="panel search">
+      <label class="field">
+        <span class="muted">Search</span>
+        <input
+          v-model="query"
+          type="search"
+          placeholder="e.g. dependency injection"
+          autocomplete="off"
+        />
+      </label>
+    </section>
+
+    <p v-if="!filtered.length" class="panel empty muted">{{ emptyMessage }}</p>
 
     <article
-      v-for="item in items"
+      v-for="item in filtered"
       :key="item.id"
       class="panel entry"
     >
       <button type="button" class="entry-head" @click="openSession(item.id)">
         <span class="id">{{ item.id }}</span>
         <span class="titles">
-          <strong>{{ item.title }}</strong>
-          <span class="muted">Stage {{ item.stageId }} · {{ item.stageTitle }}</span>
+          <strong><HighlightedText :text="item.title" :query="query" /></strong>
+          <span class="muted">
+            Stage {{ item.stageId }} ·
+            <HighlightedText :text="item.stageTitle" :query="query" />
+          </span>
         </span>
         <span class="open muted">Open →</span>
       </button>
-      <pre class="body">{{ item.cheatsheet }}</pre>
+      <pre class="body"><HighlightedText :text="item.cheatsheet" :query="query" /></pre>
     </article>
   </div>
 </template>
@@ -63,8 +90,32 @@ function openSession(id) {
   margin-top: 0.35rem;
 }
 
+.search,
 .empty {
   margin-top: 1rem;
+}
+
+.field {
+  display: grid;
+  gap: 0.4rem;
+}
+
+.field span {
+  font-size: 0.8rem;
+}
+
+input {
+  width: 100%;
+  background: var(--bg-0);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 0.65rem 0.75rem;
+  color: var(--text-strong);
+}
+
+input:focus {
+  outline: none;
+  border-color: var(--accent-border);
 }
 
 .entry {
