@@ -75,6 +75,14 @@ function migrate(database) {
       duration_sec INTEGER,
       notes TEXT NOT NULL DEFAULT ''
     );
+
+    CREATE TABLE IF NOT EXISTS qa_entries (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      question TEXT NOT NULL,
+      answer TEXT NOT NULL,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL
+    );
   `)
 
   const version = getMeta('schema_version')
@@ -338,6 +346,67 @@ export function exportProgress() {
 
 export function markMigrated() {
   setMeta('migrated_v1', '1')
+}
+
+function mapQaRow(row) {
+  return {
+    id: row.id,
+    question: row.question,
+    answer: row.answer,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  }
+}
+
+function normalizeQaText(question, answer) {
+  const q = String(question ?? '').trim()
+  const a = String(answer ?? '').trim()
+  if (!q || !a) {
+    throw new Error('Question and answer are required')
+  }
+  return { question: q, answer: a }
+}
+
+export function listQa() {
+  return openDatabase()
+    .prepare('SELECT * FROM qa_entries ORDER BY updated_at DESC')
+    .all()
+    .map(mapQaRow)
+}
+
+export function getQa(id) {
+  const row = openDatabase()
+    .prepare('SELECT * FROM qa_entries WHERE id = ?')
+    .get(Number(id))
+  return row ? mapQaRow(row) : null
+}
+
+export function createQa({ question, answer }) {
+  const text = normalizeQaText(question, answer)
+  const now = new Date().toISOString()
+  const result = openDatabase()
+    .prepare(
+      `INSERT INTO qa_entries (question, answer, created_at, updated_at)
+       VALUES (?, ?, ?, ?)`,
+    )
+    .run(text.question, text.answer, now, now)
+  return getQa(Number(result.lastInsertRowid))
+}
+
+export function updateQa(id, { question, answer }) {
+  const text = normalizeQaText(question, answer)
+  const now = new Date().toISOString()
+  openDatabase()
+    .prepare(
+      `UPDATE qa_entries SET question = ?, answer = ?, updated_at = ? WHERE id = ?`,
+    )
+    .run(text.question, text.answer, now, Number(id))
+  return getQa(id)
+}
+
+export function deleteQa(id) {
+  openDatabase().prepare('DELETE FROM qa_entries WHERE id = ?').run(Number(id))
+  return true
 }
 
 export function closeDatabase() {

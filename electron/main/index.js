@@ -19,6 +19,10 @@ import {
   markMigrated,
   getMeta,
   setMeta,
+  listQa,
+  createQa,
+  updateQa,
+  deleteQa,
 } from './db.js'
 
 const isDev = !app.isPackaged
@@ -105,6 +109,14 @@ function registerIpc() {
     markMigrated()
     return true
   })
+  ipcMain.handle('qa:list', () => listQa())
+  ipcMain.handle('qa:create', (_e, payload) => createQa(payload || {}))
+  ipcMain.handle('qa:update', (_e, id, payload) => updateQa(id, payload || {}))
+  ipcMain.handle('qa:delete', (_e, id) => {
+    deleteQa(id)
+    return true
+  })
+
   ipcMain.handle('meta:get', (_e, key) => getMeta(key))
   ipcMain.handle('meta:set', (_e, key, value) => {
     setMeta(key, value)

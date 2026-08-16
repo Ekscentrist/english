@@ -23,6 +23,12 @@ const api = {
     export: () => ipcRenderer.invoke('progress:export'),
     markMigrated: () => ipcRenderer.invoke('progress:markMigrated'),
   },
+  qa: {
+    list: () => ipcRenderer.invoke('qa:list'),
+    create: (payload) => ipcRenderer.invoke('qa:create', payload),
+    update: (id, payload) => ipcRenderer.invoke('qa:update', id, payload),
+    delete: (id) => ipcRenderer.invoke('qa:delete', id),
+  },
   meta: {
     get: (key) => ipcRenderer.invoke('meta:get', key),
     set: (key, value) => ipcRenderer.invoke('meta:set', key, value),

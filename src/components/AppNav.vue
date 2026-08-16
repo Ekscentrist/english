@@ -16,6 +16,7 @@ const links = computed(() => [
   },
   { to: '/curriculum', label: 'Curriculum', match: (name) => name === 'curriculum' },
   { to: '/cheatsheets', label: 'Cheatsheets', match: (name) => name === 'cheatsheets' },
+  { to: '/qa', label: 'Q&A', match: (name) => name === 'qa' },
   { to: '/habits', label: 'Habits', match: (name) => name === 'habits' },
   { to: '/settings', label: 'Settings', match: (name) => name === 'settings' },
 ])

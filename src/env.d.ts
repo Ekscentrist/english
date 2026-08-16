@@ -1,5 +1,13 @@
 export {}
 
+type QaEntry = {
+  id: number
+  question: string
+  answer: string
+  createdAt: string
+  updatedAt: string
+}
+
 declare global {
   interface Window {
     api?: {
@@ -17,6 +25,12 @@ declare global {
         import: (data: any) => Promise<any>
         export: () => Promise<any>
         markMigrated: () => Promise<boolean>
+      }
+      qa: {
+        list: () => Promise<QaEntry[]>
+        create: (payload: { question: string; answer: string }) => Promise<QaEntry>
+        update: (id: number, payload: { question: string; answer: string }) => Promise<QaEntry>
+        delete: (id: number) => Promise<boolean>
       }
       meta: {
         get: (key: string) => Promise<string | null>
